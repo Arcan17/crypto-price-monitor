@@ -1,6 +1,13 @@
 from django.urls import path
 
-from .views import ApiRootView, HealthView, PriceExportCsvView, PriceListView, StatsView, TokenListView
+from .views import (
+    ApiRootView,
+    HealthView,
+    PriceExportCsvView,
+    PriceListView,
+    StatsView,
+    TokenListView,
+)
 
 urlpatterns = [
     path("", ApiRootView.as_view(), name="api-root"),
