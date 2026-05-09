@@ -1,5 +1,7 @@
+import csv
 import logging
 
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
@@ -105,3 +107,31 @@ class TokenListView(APIView):
         tokens = MonitoredToken.objects.all()
         serializer = MonitoredTokenSerializer(tokens, many=True)
         return Response(serializer.data)
+
+
+class PriceExportCsvView(APIView):
+    """Export price snapshots as CSV — GET /api/export/prices.csv?symbol=BTC&hours=24"""
+
+    def get(self, request: Request) -> HttpResponse:
+        symbol = request.query_params.get("symbol")
+        hours_param = request.query_params.get("hours", "24")
+        try:
+            hours = max(1, min(int(hours_param), 8760))  # 1h – 1 year
+        except ValueError:
+            hours = 24
+
+        since = timezone.now() - timezone.timedelta(hours=hours)
+        qs = PriceSnapshot.objects.filter(fetched_at__gte=since).order_by("fetched_at")
+        if symbol:
+            qs = qs.filter(symbol=symbol.upper())
+
+        filename = f"prices_{symbol or 'all'}_{hours}h.csv"
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow(["id", "symbol", "price_usd", "fetched_at"])
+        for snap in qs.values_list("id", "symbol", "price_usd", "fetched_at"):
+            writer.writerow(snap)
+
+        return response
